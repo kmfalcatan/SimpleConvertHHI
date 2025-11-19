@@ -1,0 +1,1293 @@
+FORMAT: 1A
+HOST: https://simplyconvert.com/api/v2/
+
+# SimplyConvertAPI
+
+SimplyConvert's API allows users to create custom software integrations to interface with their SimplyConvert dashboard.
+
+# Group Authentication
+
+## API Key Authentication Process
+
+In order to access the API, copy your API key from the dashboard's [Integration Settings](https://dashboard.simplyconvert.com/app/index.php?template=integration-api) page.
+
+If you need an API key generated, please [contact us](https://dashboard.simplyconvert.com/app/index.php?template=help).
+
+Use this API key as an Authorization header in this format: `API-Key: {{api_key}}` for all your API requests.
+
+Example: 
+```
+GET /api/v2/cases HTTP/1.1
+Host: simplyconvert.com
+API-Key: xxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+Content-Type: application/json
+```
+
+# Group Limits
+
+The following rate limits apply to any API call. All rate limits are mutually exclusive.
+
+| API Action | Limit per endpoint |
+| ---------- | ------------------ |
+| List Cases | 300/minute |
+| Get Case | 2000/minute |
+| Create Case | 2000/minute |
+| Upload Documents | 200/minute |
+| Download Documents | 200/minute |
+| ANY unspecified | 2000/minute |
+
+The limits are introduced at the account level, not on the user level or per individual application.
+
+SimplyConvert API will return `429 Too Many Requests` error when request limit is exceeded. If you hit the limit, whenever possible, please queue API calls on your end and resend API calls after the retry timer. This will help to prevent getting 429 errors.
+
+*SimplyConvert reserves the right to modify these limits as needed to protect the integrity of the SimplyConvert Platform.*
+
+# Group Cases Resource 
+
+## All Cases [/cases{?filter,filter_id,fields,order,length,page,search}]
+
+### List all cases [GET]
+
+##### Filter Parameters
+The `filter` URL parameter accepts a list of filters. Each filter should be separated by a `|` character. Each filter will have a value or list of values. Separate the filter name from the values using a `:`. If including a list of values, separate each value with a `,`. Since this field will contain reserved characters, it is a best practice to URL encode the filter parameter before making requests.
+
+Example: `lit_ids:15,24|lit_range:IN`
+
+
+**Case Property Filters**
+| Field | Description | Allowed Values | Default | Multiple |
+| ----- | ----------- | -------------  | ------- | -------- |
+| lit_ids | Litigation IDs | See [Litigations resource](https://simplyconvertapiv2.docs.apiary.io/#reference/litigations-resource) for IDs | *null* | Yes |
+| lit_range | Whether to include or exclude specified litigation ID(s)  | `IN` or `NOT IN` | `IN`| No |
+| status_ids | Case Status IDs| See [Status resource](https://simplyconvertapiv2.docs.apiary.io/#reference/status-resource) for IDs | *null* | Yes |
+| status_range | Whether to include or exclude specified status ID(s) | `IN` or `NOT IN` | `IN` | No |
+| rank | Lead rank | `0`: unranked, `1`: Lead 1, `2`: Lead 2, `3`: Lead 3 | `0,1,2,3` | Yes |
+| products_ids | Relevant Product ID(s) | See [Products resource](https://simplyconvertapiv2.docs.apiary.io/#reference/products-resource) for IDs | *null* | Yes |
+| products_range | Whether to include any, include all, exclude any, or exclude all specified product ID(s) | `IN`, `IN ALL`, `NOT IN`, or `NOT IN ALL` | `IN` | No |
+| conditions_ids | Relevant Condition IDs | See [Conditions resource](https://simplyconvertapiv2.docs.apiary.io/#reference/conditions-resource) for IDs | *null* |  Yes |
+| conditions_range | Whether to include any, include all, exclude any, or exclude all specified condition ID(s) | `IN`, `IN ALL`, `NOT IN`, or `NOT IN ALL` | `IN` | No |
+| information_ids | Relevant Information IDs | See [Information resource](https://simplyconvertapiv2.docs.apiary.io/#reference/information-resource) for IDs | *null* |  Yes |
+| information_range | Whether to include any, include all, exclude any, or exclude all specified information ID(s) | `IN`, `IN ALL`, `NOT IN`, or `NOT IN ALL` | `IN` | No |
+| portal_status | Portal status of case, used to determine if all automated documents have been signed | `incomplete`, `review`, `complete`, `paused`, `failed review`, `email sent`, `contact client`, `review by firm`, or `complete by firm` | `incomplete`, `review`, `complete`, `paused`, `failed review`, `email sent`, `contact client`, `review by firm`, `complete by firm` | Yes |
+| portal_status_range | Whether to include or exclude specified portal status(es) |`IN` or `NOT IN` | `IN` | No |
+| incomplete_range | Specifies whether to include spam, incomplete, and/or duplicate records in results | `exclude` to exclude spam/incomplets/duplicates, `include` to include incompletes, `include_spam` to include spam, `duplicate_only` to return only duplicates, `include_only` to return only incompletes, `include_spam_only` to return only spam, `include_all` to ignore this filter and include spam, incompletes and duplicates in results  | `exclude` | No |
+| referral_status | Referral status if case is referred | `accepted`, `awaiting`, `rejeced`, or `none` | `accepted`, `awaiting`, `rejeced`, `none` | Yes |
+
+**Company Filters**
+| Field | Description |
+| ----- | ----------- |
+| company_ids | The SimplyConvert company ID(s) of the company that the case belongs to. |
+| company_range | One of `IN` or `NOT IN`. Defaults to `IN` |
+| referred_from_companies | The SimplyConvert company ID(s) of the company that the case was referred from. |
+| referred_from_range | One of `IN` or `NOT IN`. Defaults to `IN` |
+| referred_to_companies | The SimplyConvert company ID(s) of the company that the case was referred to. |
+| referred_to_range | One of `IN` or `NOT IN`. Defaults to `IN` |
+
+**State Filters**
+| Field | Description |
+| ----- | ----------- |
+| states | The state the client lives in (expects full state name). |
+| state_range | Whether to include or exclude states specified in results. |
+| state_injured | The state where the injured party was injured. |
+| state_injured_range | Whether to include or exlude the states specified in state_injured. |
+
+**Date Filters**
+
+Dates should be specified in the format `YYYY-MM-DD` *or* `YYYY-MM-DD HH;mm;ss`. If `HH;mm;ss` is not included, it will default to `00;00;00`.
+
+| Field | Description |
+| ----- | ----------- |
+| start_date | Limit results to cases created after this date |
+| end_date | Limit results to cases created before this date |
+| injury_start_date | Limit results to cases with injuries after this date (uses `sol_trigger_date` field) |
+| injury_end_date | Limit results to cases with injuries before this date (uses `sol_trigger_date` field) |
+| completed_start_date | Limit results to cases that completed all documents after this date| 
+| completed_end_date | Limit results to cases that completed all documents before this date |
+
+##### Search Parameters
+The `search` URL parameter consists of several parts: the value to search, the field to search, and the search range (search range is optional and defaults to `EQUALS` if not provided). Each part of the search should be separated with a `:`. Since this field will contain reserved characters, it is a best practice to URL encode the filter parameter before making requests.
+
+Example: `12345:id:EQUALS`
+
+Some fields also allow you to search for a list of values by separating search values with a `,`.
+
+Example `12345,67890:id:EQUALS`
+
+| Field | Description | Allowed Ranges | Multiple |
+| ----- | ----------- | -------------- | -------- |
+| id    | Search by SimplyConvert case ID | `EQUALS`, `NOT-EQUALS`| Yes |
+| name  | Search by client and injured party name (first and/or last) | `EQUALS`, `NOT-EQUALS`, `IN`, `NOT IN`, `STARTS WITH`, `ENDS WITH`, `EMPTY`, `FILLED` | No |
+| email | Search by primary email of client | `EQUALS`, `NOT-EQUALS`, `IN`, `NOT IN`, `STARTS WITH`, `ENDS WITH`, `EMPTY`, `FILLED` | Yes | 
+| phone | Search by primary phone of client | `EQUALS`, `NOT-EQUALS`, `IN`, `NOT IN`, `STARTS WITH`, `ENDS WITH`, `EMPTY`, `FILLED` | Yes |
+
+##### Paging
+This endpoint is paged and returns 100 results per page by default (maximum of 1,000 per page). The `meta` field in the response contains information regarding the total number of records, number of records returned, next page, and previous page. `nextPage` will be null when there are no more pages.
+
+```
+"meta":{
+      "recordsTotal":1000,
+      "recordsFiltered":1000,
+      "records":100,
+      "nextPage":1,
+      "prevPage":null
+   }
+```
+
++ Parameters
+    + filter: `lit_ids:15,24|lit_range:IN` (string,optional) - Filter results by value of a given field. See **filter parameters** section for more info.
+    + filter_id: `13` (int, optional) - Filter results using a saved filter.
+    + fields: `case_id, fname, lname, litigation_name` (string,optional) - The fields that should be returned.
+    + order: `case_id:desc` (string,optional) - The order returned cases will be sorted in.
+    + length: `100` (int, optional) - Number of records to return per page, max of 1000.
+    + page: `0` (int, optional) - Page number to start on if returning limited number of records.
+    + search: `john:name:IN` (string, optional) - Search for a given value within any other filters that have been applied. See **search parameters** secion for more info.
+
++ Response 200 (application/json)
+
+    + Body
+    
+            {
+               "meta":{
+                  "recordsTotal":1000,
+                  "recordsFiltered":100,
+                  "records":100,
+                  "nextPage":1,
+                  "prevPage":null
+               },
+               "data":[
+                    {
+                        "case_id":"12345",
+                        "uuid":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+                        "name":"Smith, John",
+                        "created_date":"2022-06-03 11:54:42",
+                        "email":"johnsmith@example.com",
+                        "phone":"555-555-5555",
+                        "state":"Illinois",
+                        "zip":"62020",
+                        "litigation_name":"Camp Lejeune",
+                        "litigation_category_name":"Toxic Exposure",
+                        "rank_number":"1",
+                        "status_name":"Signed",
+                        "portal_status":"incomplete",
+                        "completed_date":null,
+                        "documents":[
+                            {
+                                "document_id:"xxxxxxxxxxxxxxxxxxxxxx",
+                                "template_type":"retainer", 
+                                "status":"document.completed"
+                            },
+                            {
+                                "document_id:"xxxxxxxxxxxxxxxxxxxxxx",
+                                "template_type":"secondary", 
+                                "status":"document.viewed"
+                            }
+                        ],
+                        "products":null,
+                        "conditions":[
+                            {
+                                "id":"20",
+                                "name":"Bladder Cancer"
+                            }
+                        ],
+                        "information":[
+                            {
+                                "id":"388",
+                                "name":"Not working with another law firm"
+                            },
+                            {
+                                "id":"1066",
+                                "name":"Military"
+                            }
+                        ],
+                        "name_injured": "Smith, Jane",
+                        "fname_injured":"Jane",
+                        "lname_injured":"Smith,
+                        "phone_injured":"444-444-4444",
+                        "email_injured":"janesmith@example.com",
+                        "state_injured":"Illinois",
+                        "sol_trigger_date":null,
+                        "birthday_injured":"1990-02-01",
+                        "death_date": null,
+                        "referred_from_company":null,
+                        "referred_to_company":null,
+                        "referral_status":null,
+                        "lead_source_type":"Bot",
+                        "last_engagement":"2022-06-03 11:55:29",
+                        "last_contact":"2022-06-03 11:54:42",
+                        "next_action":"No Action",
+                        "company_name":"SimplyConvert",
+                        "campaigns":[],
+                        "fname":"John",
+                        "lname":"Smith",
+                        "street1":"123 Smith St",
+                        "street2":null,
+                        "city":"Chicago",
+                        "counsel":"",
+                        "feesplit":"",
+                        "id":"12345",
+                        "last_note_type":"Automated SMS",
+                        "last_note_status":"Sent",
+                        "last_contact_type":null,
+                        "last_contact_status":null,
+                        "referred_to_company_id":null,
+                        "archived":"0",
+                        "status_id":"8",
+                        "litigation_id":"116",
+                        "messages":[],
+                        "email_status":"unconfirmed",
+                        "phone_status":"unconfirmed",
+                        "bot_language":"en-US",
+                        "details":"",
+                        "meta":{},
+                        "external_data":{}
+                    },
+                    {...} 
+               ]
+            }
+            
+
+### Create new case [POST]
+
+##### Case Resource Properties
+The following describes the properties that can be included when creating a Case.
+
+| Property | Example | Type | Description |
+| -------- | ------- | ---- | ----------- |
+| company_uuid | `xxxxxxxxxxxxxxxxxxxxxxxxxx` | string | The Company's UUID to post the case to (if not posting to company associated with API key). |
+| litigation_id | `15` | int | The litigation ID belonging to the case. |
+| status_id | `8` | int | The status ID belonging to the case. |
+| fname |  `John` | string | Client first name |
+| mname | `Joe` | string | Client middle name |
+| lname | `Smith` | string | Client last name |
+| suffix | `Jr.` | string | Client name suffix |
+| email | `john@smith.com` | string | Client email address |
+| email2 | `john2@smith.com` | string | Client secondary email address |
+| phone | `123-456-7890` | string | Client phone number |
+| phone2 | `098-765-4321` | string | Client secondary phone number |
+| street1 | `123 Main St.` | string | Client street address line 1 |
+| street2 | `Apt A` | string | Client street address line 2 |
+| city | `Chicago` | string | Client address city |
+| state | `Illinois` | string | Client address state |
+| zip | `12345` | string | Client address zip code |
+| ssn | `444-23-1111` | string | Client social security number |
+| relation | `father` | string | Client relation to injured |
+| marital_status | `married` | string | Client marrital status |
+| fname_injured | `Mary` | string | Injured party first name |
+| mname_injured | `Sue` | string | Injured party middle name |
+| lname_injured | `Smith` | string | Injured party last name |
+| suffix_injured | `II` | string | Injured party name suffix |
+| birthday_injured | `1965-12-31` | date string | Injured party birth date |
+| death_date | `2022-01-01` | date string | Injured party date of death |
+| email_injured | `mary@smith.com` | string | Injured party email address |
+| phone_injured | `123-456-7890` | string | Injured party phone number |
+| street1_address_injured | `123 Main St.` | string | Injured party street address line 1 |
+| street2_address_injured | `Apt A` | string | Injured party street address line 2 |
+| city_address_injured | `Chicago` | string | Injured party address city |
+| state_address_injured | `Illinois` | string | Injured party address state |
+| zip_address_injured | `12345` | string | Injured party address zip code |
+| state_injured | `Illinois` | string | State where injury occurred |
+| ssn_injured | `333-44-5555` | string | Injured party social security number |
+| sol_trigger_date | `2022-01-01` | date string | Trigger date used for qualification, exact use varies by litigation. [Contact us](mailto:support@simplyconvert.com) for more info. | 
+| procedure_date | `2022-01-01` | date string | Procedure date used for qualification, exact use varies by litigation. [Contact us](mailto:support@simplyconvert.com) for more info. |
+| procedure_followup_date | `2022-01-01` | date string | Procedure date used for qualification, exact use varies by litigation. [Contact us](mailto:support@simplyconvert.com) for more info. |
+| bot_language | `en-US` | string | [IETF BCP 47](https://en.wikipedia.org/wiki/IETF_language_tag) language tag |
+| products | `[145, 1415]` | int[] *or* string | Array of product IDs associated with the case or comma separated string of product labels.\* |
+| conditions | `[51, 1515]` | int[] *or* string | Array of condition IDs associated with the case or comma separated string of condition labels.\* |
+| information | `[143, 95]` | int[] *or* string | Array of information IDs associated with the case or comma separated string of information labels.\* |
+| tags | `['xxxxxxxxxxxxxxxxxxxxx']` | string[] | Array of tag UUIDs associated with the case. |
+| details | `any additional details` | string  | String containing any additional information that does not map directly to another field. Use HTML line breaks: `<br>` to separate lines for formatting.|
+| lead_source | `{}` | object | JSON object containing session data, see below.|
+| portal_status | `complete` | string | String containing one of `complete`, `incomplete`, `review`, `paused`, `failed review`, `review by firm`, or `complete by firm`. Defaults to `complete`. |
+| meta | `{}` | object | JSON object containing additional data specific to case type. Contact us for details on what we support in this field. |
+| external_data | `{}` | object | JSON object containing external data, usually IDs from a third party. Contact us for details on what we support in this field. |
+
+\* The products, conditions, and information fields can receive a string instead of an int[]. If a string is passed, the system will attempt to parse values from the string by splitting on commas and searching for matches to recognized values. This process is best effort and may result in the need for manual review.
+
+##### Inserting Referred Cases
+SimplyConvert can be used to refer cases between firms electronically so that both firms can view the referred case on each of their individual dashboards. 
+
+###### Situation 1: Company A referring to Company B
+If the company that owns the API key (company A) is referring to another company (company B) this method can be used to establish the referral relationship inside SimplyConvert.
++ referral: `false` (boolean, optional) - If set to `true` and `company_uuid` is also passed, this case will be inserted as a referral from the posting company to the company specified by `company_uuid`.
+
+###### Situation 2: Company A is posting a case on behalf of Company B referring to Company C
+If the company that owns the API key (company A) is posting cases on behalf of a company (company B) that are being referred to a company (company C), use this method. When posting using this method there is no need to include `company_uuid` in the POST body.
++ referred_from_company_uuid: `xxxxxxxxxxxxxxxxxxxxxxxxxx` (string, optional) - String containing UUID of firm referring the case. Contact SimplyConvert for the company UUID needed.
++ referred_to_company_uuid: `xxxxxxxxxxxxxxxxxxxxxxxxxx` (string, optional) - String containing UUID of firm receiving the referral. Contact SimplyConvert for the company UUID needed.
+
+###### Situation 3: Referral fields only for informational need
+This situation can be used to insert referred from/to companies without knowing their UUID. This method does not establish a true referral relationship within the SimplyConvert dashboard. These fields are considered informational only for the firm that the case is being posted to and will not result in other firms being able to view the case (if they have a SimplyConvert dashboard). 
++ referred_from_company: `Example Law Firm` (string, optional) - String containing name of firm referring the case.
++ referred_to_company: `Example Law Firm` (string, optional) - String containing name of firm receiving the referral, only used if `referred_from_company` is provided. If not specified when `referred_from_company` is provided, will use company name associated with `company_uuid` if passed, otherwise defaults to the posting company. 
+
+##### Lead Source Data
+The lead source JSON can contain any of the following fields:
+
++ pageon
++ referring_site
++ referring_url
++ referring_page
++ source
++ search_terms
++ browser
++ browser_version
++ os
++ device
++ country
++ region
++ city
++ isp
++ coordinates
++ postal_code
++ area_code
++ user_agent
++ tracking_data: JSON object with additional tracking information
++ type: one of `Call`, `Email`, `Embedded`, `File Import`, `Manual Intake`, `Overlay`, `API`, or `Unknown`. Defaults to `API`.
++ channel: one of `Direct`, `Organic`, `Paid`, `Referral`, `Social`, or `Unknown`. Defaults to `Unknown`.
+
+
+
++ Request (application/json)
+
+        {   
+            "company_uuid": "xxxxxxxxxxxxxxxxxxxxxxxxx",
+            "litigation_id": 1,
+            "status_id": 8,
+            "fname": "",
+            "mname": "",
+            "lname": "",
+            "suffix": "",
+            "email": "",
+            "email2": "",
+            "phone": "",
+            "phone2": "",
+            "phone3": "",
+            "street1": "",
+            "street2": "",
+            "city": "",
+            "state": "",
+            "zip": "",
+            "ssn": "",
+            "relation": "",
+            "marital_status": "",
+            "fname_injured": "",
+            "mname_injured": "",
+            "lname_injured": "",
+            "suffix_injured": "",
+            "birthday_injured": "",
+            "death_date": "",
+            "email_injured": "",
+            "phone_injured": "",
+            "street1_address_injured": "",
+            "street2_address_injured": "",
+            "city_address_injured": "",
+            "state_address_injured": "",
+            "state_injured": "",
+            "zip_address_injured": "",
+            "ssn_injured": "",
+            "details": "",
+            "sol_trigger_date": "",
+            "procedure_date": "",
+            "procedure_followup_date": "",
+            "bot_language": "en-US",
+            "products": [],
+            "conditions": [],
+            "information": [],
+            "tags": [],
+            "lead_source": {
+                "pageon": "https://trulaw.com",
+                "referring_site": "https://google.com",
+                "source": "Google",
+                "browser": "Chrome",
+                "device": "iPhone 12",
+                "type": "Overlay",
+                "channel": "Organic"
+            }
+        }
+        
++ Response 201 (application/json)
+
+        {
+            "message": "Created case 118114",
+            "data": {
+                "uuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+                "dual_rep": false
+            }
+        }
+
+## Cases by ID [/cases/{uuid}{?nested}]
+
+### Retrieve a case [GET]
+
++ Parameters 
+    + uuid: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` (string, required) - The UUID of the case to be retrieved.
+    + nested: '' (any, optional) - If set, response will include conversation and notes data related to case.
++ Response 200 (application/json)
+
+    + Body
+
+            {
+                "data": {
+                    "case_id": "1234567",
+                    "fname": "John",
+                    "lname": "Smith",
+                    "company_name": "Smith Law Firm",
+                    "email": "john@smith.com",
+                    "email2": null,
+                    "phone": "111-222-3333",
+                    "phone2": null,
+                    "phone3": null,
+                    "street1": "123 Main St",
+                    "street2": null,
+                    "city": "Chicago",
+                    "state": "Illinois",
+                    "zip": "60007",
+                    "relation": null,
+                    "marital_status": null,
+                    "fname_injured": null,
+                    "lname_injured": null,
+                    "birthday_injured": "1997-04-28",
+                    "death_date": "1999-06-24",
+                    "email_injured": null,
+                    "phone_injured": null,
+                    "street1_address_injured": null,
+                    "street2_address_injured": null,
+                    "city_address_injured": null,
+                    "state_address_injured": "Illinois",
+                    "state_injured": "Illinois",
+                    "zip_injured": null,
+                    "details": "Conditions: headaches, brain cancer, bladder cancer, renal toxicity ... ",
+                    "sol_trigger_date": null,
+                    "procedure_date": null,
+                    "procedure_followup_date": null,
+                    "litigation_id": 116
+                    "litigation_name": "Camp Lejeune",
+                    "status_id": 8,
+                    "status_name": "Signed",
+                    "tags": [
+                        {
+                            "id": "1",
+                            "hash": "0937afa17f4dc08f3c0e5dc908158370ce64df86",
+                            "name": "init_simplyconvert_tags",
+                            "category": "analytics"
+                        },
+                        {
+                            "id": "5",
+                            "hash": "2d47436625a76b11e5eca1b94e55e2aa98d5f725",
+                            "name": "contact_captured",
+                            "category": "analytics"
+                        },
+                        {
+                            "id": "105",
+                            "hash": "666f0c185c499a8e3c9a719b10ac9fbac3964739",
+                            "name": "Campaign Name",
+                            "category": "campaign"
+                        },
+                    ],
+                    "conditions": [
+                        {
+                            "id": "20",
+                            "name": "Bladder Cancer"
+                        },
+                        {
+                            "id": "138",
+                            "name": "Headaches"
+                        },
+                        {
+                            "id": "377",
+                            "name": "Brain Cancer"
+                        },
+                        {
+                            "id": "660",
+                            "name": "Renal Toxicity"
+                        }
+                    ],
+                    "information": [
+                        {
+                            "id": "388",
+                            "name": "Not working with another law firm"
+                        },
+                        {
+                            "id": "1066",
+                            "name": "Military"
+                        },
+                        {
+                            "id": "1089",
+                            "name": "At Camp Lejeune for at least 30 days"
+                        }
+                    ],
+                    "products": [],
+                    "uuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+                    "drip": null,
+                    "bot_language": "en-US",
+                    "sms_portal_url": "https://dev.sc2.io/xxxxxxxx-xxxx",
+                    "email_portal_url": "https://dev.dashboard.simplyconvert.com/client/index.php?id=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+                    "auth_token": "1234",
+                    "attorney_name": null,
+                    "attorney_phone": null,
+                    "attorney_email": null,
+                    "referred_from_company": "Simply Convert",
+                    "referred_to_company": "",
+                    "referral_status":null,
+                    "last_contact":"2022-06-03 11:54:42",
+                    "last_contact_type": "call",
+                    "last_contact_status": "answered",
+                    "totalfee": "40%",
+                    "feesplit": "NA",
+                    "counsel": "Simplyconvert",
+                    "lead_source": {
+                        "id": "3594283",
+                        "ip": "111.111.11.111",
+                        "widget_url": "https://bot.simplyconvert.com/?hash=",
+                        "widget_type": "Instant Case Evaluator",
+                        "pageon": "",
+                        "referring_site": "",
+                        "referring_url": "",
+                        "referring_page": "",
+                        "source": "Facebook",
+                        "search_terms": "",
+                        "browser": "Mobile Safari UI/WKWebView",
+                        "browser_version": "14.6.0",
+                        "os": "iOS 14.6.0",
+                        "device": "iPhone 9,1.0.0",
+                        "country": "",
+                        "region": "",
+                        "city": "",
+                        "isp": "",
+                        "coordinates": "",
+                        "postal_code": "",
+                        "area_code": "",
+                        "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 221.0.0.9.115 (iPhone9,1; iOS 14_6; en_US; en-US; scale=2.00; 750x1334; 349031919)",
+                        "created_date": "2022-04-28 12:50:31",
+                        "modified_date": "2022-04-28 12:50:32",
+                        "tracking_data": "[{\"type\": \"ga\", \"client_id\": \"210973523.1651168220\", \"target_id\": \"UA-70087324-1\"}]",
+                        "case_id": "1653304",
+                        "type": "Embedded",
+                        "channel": "Paid"
+                    },
+                    "meta": {},
+                    "external_data": {},
+                    "followup": 1
+                }
+            }
+            
+### Update a case [PUT]
+
++ Parameters 
+    + uuid: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` (string, required) - The UUID of the case being updated.
+    
++ Request (application/json)
+
+        {
+            "litigation_id": 1,
+            "status_id": 8,
+            "fname": "",
+            "lname": "",
+            "email": "",
+            "email2": "",
+            "phone": "",
+            "phone2": "",
+            "phone3": "",
+            "street1": "",
+            "street2": "",
+            "city": "",
+            "state": "",
+            "zip": "",
+            "relation": "",
+            "marital_status": "",
+            "fname_injured": "",
+            "lname_injured": "",
+            "birthday_injured": "",
+            "death_date": "",
+            "email_injured": "",
+            "phone_injured": "",
+            "street1_address_injured": "",
+            "street2_address_injured": "",
+            "city_address_injured": "",
+            "state_address_injured": "",
+            "zip_address_injured": "",
+            "state_injured": "",
+            "details": "",
+            "sol_trigger_date": "",
+            "procedure_date": "",
+            "procedure_followup_date": "",
+            "bot_language": "en-US",
+        }
+        
++ Response 200 (application/json)
+
+        {
+            "message": "Updated case 82118"
+            "data": {},
+        }
+
+### Archive a case [DELETE]
+
++ Parameters 
+     + uuid: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` (string, required) - The UUID of the case to archive.
+     
++ Response 200 (application/json)
+
+        {
+            "message":"Archived case 12345"
+        }
+
+
+## Referral [/cases/{uuid}/referral]
+
+### Refer a case [PUT]
+
+##### Adding a Referral to a Case
+SimplyConvert can be used to refer cases between firms electronically so that both firms can view the referred case on each of their individual dashboards.
+
+###### Setting the referred from and referred to companies
+The following parameters are required in the body to setup a referral for a case.  Once a referral is setup for a case it will not be able to be modified.  [Contact SimplyConvert](mailto:support@simplyconvert.com) for any changes to an existing referral.
++ referred_from_company_uuid: `xxxxxxxxxxxxxxxxxxxxxxxxxxx` (string, required) - String containing UUID of firm referring the case. [Contact SimplyConvert](mailto:support@simplyconvert.com) for the company UUID needed.
++ referred_to_company_uuid: `xxxxxxxxxxxxxxxxxxxxxxxxxxx` (string, required) - String containing UUID of firm receiving the referral. [Contact SimplyConvert](mailto:support@simplyconvert.com) for the company UUID needed.
+
++ Parameters 
+     + uuid: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` (string, required) - The UUID of the case.
+     
++ Request (application/json)
+
+        { 
+            referred_from_company_uuid: `xxxxxxxxxxxxxxxxxxxxxxxxxxx`,
+            referred_to_company_uuid: `xxxxxxxxxxxxxxxxxxxxxxxxxxx`,
+        }
++ Response 200 (application/json)
+
+        {
+            "message":"Set referral for case 12345"
+        }
+
++ Response 400 (application/json)
+
+        {
+            "message":"this case has already been referred"
+        }
+        {
+            "message":"referred_from_company_uuid not found"
+        }
+        {
+            "message":"referred_to_company_uuid not found"
+        }
+        {
+            "message":"missing required parameters in request: referred_from_company_uuid, referred_to_company_uuid"
+        }
+
+## Documents [/cases/{uuid}/documents]
+
+### Post a document [POST]
+
+##### File Upload Metadata Field
+
+`file_meta` is provided along with a document upload and consists of the following fields in JSON format:
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| filename | string *optional* | The name of the document after upload. Defaults to local file name. |
+| status | string *optional* | Document's status, must be one of `voided`, `completed`, `expired`, `sent`, `viewed`, `invalid`, `declined`, `uploaded`, or `draft`. Defaults to `completed`.|
+| type | string *optional* | Document's type, must be one of `retainer`, `hipaa`, `hitech`, `secondary`, `other`. Defaults to `retainer`. |
+| notify | boolean *optional* | Whether to notify dashboard users of a completed document. Defaults to `false`. |
+| signed | boolean *optional* | Whether this document should trigger the case to enter `signed` status. Defaults to `false`. |
+| tags | string[] *optional* | Array of document tag id(s) that are associated with document.  Contact SimplyConvert for a list of ids. |
+
+Example `file_meta` for a signed contract:
+```
+{
+    "filename":"john_smith_retainer.pdf",
+    "status":"completed",
+    "type":"retainer",
+    "tags":["123456789"]
+}
+```
+
+##### Uploading Multiple Documents in a Single File
+It is possible to upload multiple documents (ex: retainer, HIPAA, and secondary) from a single file. When doing so, SimplyConvert API can split the file into its individual documents if provided with the right information in `file_meta`.
+
+In order to take advantage of this functionality, the value for `file_meta` should be passed as an array of JSON objects, where each object in the area is a valid `file_meta` object as described above with the addition of a `range` field. The `range` field should define the page range of the document being defined. Page ranges can be defined with a mixture of comma separated lists of page numbers and/or ranges using hyphens (ex: `1,2,5-8`).
+
+Example `file_meta` for a packet containing a retainer, HIPAA, and secondary questionnaire:
+```
+[
+    {
+        "filename":"john_smith_retainer.pdf",
+        "status":"completed",
+        "type":"retainer",
+        "range":"0-2"
+    },
+    {
+        "filename":"john_smith_med_auth.pdf",
+        "status":"completed",
+        "type":"hipaa",
+        "range":"3,4"
+    },
+    {
+        "filename":"john_smith_questionnaire.pdf",
+        "status":"completed",
+        "type":"secondary",
+        "range":"5"
+    }
+]
+```
+
++ Parameters 
+    + uuid: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` (string, required) - The UUID of the case that the document is being posted to.
+
++ Request
+
+    + Header
+    
+            Content-Type: multipart/form-data; boundary=Boundary
+
+    + Body
+    
+            ----Boundary
+            Content-Disposition: form-data; name="file"; filename="test_contract.pdf"
+            Content-Type: application/pdf
+            
+            (data)
+            ----Boundary
+            Content-Disposition: form-data; name="file_meta"
+            
+            { "status": "completed", "filename":"example_contract.pdf", "type":"retainer","notify":false, "signed":false}
+            ----Boundary
+        
++ Response 200 (application/json)
+
+    + Body
+        
+            {
+                "message": "Document Uploaded"
+            }
+
+### Get case documents [GET]
+Returns a zip file containing all completed documents for the provided case.
++ Parameters
+    + uuid: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` (string, required) - The UUID of the case to retrieve documents from.
+    
++ Response 200 (application/zip)
+
+### Void case documents [DELETE]
+Voids all documents within a given case that are in 'sent' or 'viewed' status.
++ Parameters
+    + uuid: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` (string, required) - The UUID of the case to void documents from.
+    
++ Response 200 (application/json)
+
+    + Body
+        
+             {
+                "message": "Case xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx documents voided"
+            }
+
+## Documents by ID [/cases/{uuid}/documents/{document_uuid}]
+
+### Get document [GET]
+Returns file specified by `document_uuid`. File types may vary depending on the source of the document.
++ Parameters
+    + uuid: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` (string, required) - The UUID of the case to retrieve document from.
+    + document_uuid: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` (string, required) - The UUID of the document to retrieve.
+
++ Response 200 (application/pdf)
+
+### Void document [DELETE]
+Voids specified document.
++ Parameters
+    + uuid: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` (string, required) - The UUID of the case to void documents from.
+    + document_uuid: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` (string, required) - The UUID of the document to void.
++ Response 200 (application/json)
+
+    + Body
+        
+            {
+                "message": "Document xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx voided"
+            }
+
+
+## Conversation [/cases/{uuid}/conversation]
+
+### Retrieve a conversation [GET]
+
++ Parameters
+    + uuid: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` (string, required) - The case's UUID to retrieve the conversation from.
++ Response 200 (application/json)
+
+    + Body
+    
+            {
+                "data": [
+                            {
+                                "id": "106536",
+                                "msg_type": "0",
+                                "message": "Hi there, my name is Casey.  Can I ask you a few questions about your case?",
+                                "details": null,
+                                "timestamp": "04/13/19 12:04:51 AM"
+                            },
+                            {
+                                "id": "106537",
+                                "msg_type": "0",
+                                "message": "The information you provide me is confidential and will only be shared with the lawyers I work with.",
+                                "details": null,
+                                "timestamp": "04/13/19 12:04:51 AM"
+                            },
+                            {
+                                "id": "106538",
+                                "msg_type": "1",
+                                "message": "Pradaxa",
+                                "details": null,
+                                "timestamp": "04/13/19 12:04:52 AM"
+                            },
+                            {
+                                "id": "106539",
+                                "msg_type": "0",
+                                "message": "Are you concerned about side effects, injury or a diagnosis that you believe resulted from taking Pradaxa?",
+                                "details": null,
+                                "timestamp": "04/13/19 12:04:52 AM"
+                            },
+                            {...}
+                        ]
+            }
+
+## Notes [/cases/{uuid}/notes]
+
+### Retrieve case notes [GET]
+
++ Parameters
+    + uuid: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` (string, required) - The case's UUID to retrieve the notes from.
++ Response 200 (application/json)
+
+    + Body
+    
+            {
+                "data": [
+                            {
+                                "id": "123456",
+                                "title": "test",
+                                "description": "<p>test</p>",
+                                "attachment": null,
+                                "user_name": null,
+                                "user_id": "123",
+                                "case_id": "123456",
+                                "status_id": "4",
+                                "note_type_id": "1",
+                                "priority": "0",
+                                "created_date": "2023-03-23 11:48:45",
+                                "modified_date": "2023-03-23 11:48:45",
+                                "fname": "SimplyConvert",
+                                "lname": "Admin (Jonah)",
+                                "note_type": "Call",
+                                "note_status": "Mailbox Full"
+                            },
+                            {...}
+                        ]
+            }
+
+# Group Litigations Resource
+
+## All Litigations [/litigations]
+
+### List all litigations [GET]
+
++ Response 200 (application/json)
+    
+    + Body
+    
+            [
+                {
+                    "id": "80",
+                    "name": "911 Victim Compensation Fund"
+                },
+                {
+                    "id": "15",
+                    "name": "Abilify"
+                },
+                {
+                    "id": "87",
+                    "name": "Allergan"
+                },
+                {
+                    "id": "95",
+                    "name": "Allstate Insurance"
+                },
+                {
+                    "id": "5",
+                    "name": "Androgel"
+                },
+                {
+                    "id": "113",
+                    "name": "Ankle Replacement"
+                },
+                {
+                    "id": "48",
+                    "name": "Asbestos"
+                },
+                {
+                    "id": "33",
+                    "name": "Assault"
+                },
+                {
+                    "id": "99",
+                    "name": "Baby Food"
+                },
+                {
+                    "id": "86",
+                    "name": "Baby Opioids"
+                },
+                {
+                    "id": "114",
+                    "name": "Bair Hugger"
+                },
+                {...}
+            ]
+
+## Litigations By Id [/litigations/{litigationId}]
+
+### Retrieve a litigation [GET]
+
++ Parameters 
+    + litigationId: `15` (number, required) - The ID of the litigation to be retrieved.
+
++ Response 200 (application/json)
+
+    + Body
+    
+            [
+                {
+                    "id": "15",
+                    "name": "Abilify"
+                }
+            ]
+            
+
+            
+# Group Conditions Resource 
+
+## All Conditions [/conditions]
+
+### List all conditions [GET]
+
++ Response 200 (application/json)
+    
+    + Body
+    
+            [
+                {
+                    "id": "560",
+                    "name": "Abdomen Injury",
+                    "combined": "560:Abdomen Injury",
+                    "category": "injury"
+                },
+                {
+                    "id": "384",
+                    "name": "Abdomen radiation exposure",
+                    "combined": "384:Abdomen radiation exposure",
+                    "category": "symptom"
+                },
+                {
+                    "id": "1",
+                    "name": "Abdominal Pain",
+                    "combined": "1:Abdominal Pain",
+                    "category": "symptom"
+                },
+                {
+                    "id": "321",
+                    "name": "Abduction",
+                    "combined": "321:Abduction",
+                    "category": "injury"
+                },
+                {
+                    "id": "2",
+                    "name": "Abscesses",
+                    "combined": "2:Abscesses",
+                    "category": "symptom"
+                },
+                {
+                    "id": "259",
+                    "name": "Acute Disseminated Encephalomyelitis",
+                    "combined": "259:Acute Disseminated Encephalomyelitis",
+                    "category": "symptom"
+                },
+                {
+                    "id": "3",
+                    "name": "Acute Interstitial Nephritis",
+                    "combined": "3:Acute Interstitial Nephritis",
+                    "category": "symptom"
+                },
+                {...}
+            ]
+
+## Conditions By Id [/conditions/{conditionId}]
+
+### Retrieve a condition [GET]
+
++ Parameters 
+    + conditionId: `115` (number, required) - The ID of the condition to be retrieved.
+
++ Response 200 (application/json)
+
+    + Body
+    
+            [
+                {
+                    "id": "115",
+                    "name": "Nausea vomiting or dizziness",
+                    "combined": "115:Nausea vomiting or dizziness",
+                    "category": "symptom"
+                }
+            ]
+            
+
+# Group Products Resource 
+
+## All Products [/products]
+
+### List all products [GET]
+
++ Response 200 (application/json)
+    
+    + Body
+    
+            [
+                {
+                    "id": "274",
+                    "name": "Abbott Gallant ICD",
+                    "combined": "274:Abbott Gallant ICD",
+                    "category": "device"
+                },
+                {
+                    "id": "1",
+                    "name": "Abilify",
+                    "combined": "1:Abilify",
+                    "category": "drug"
+                },
+                {
+                    "id": "208",
+                    "name": "AccessPak",
+                    "combined": "208:AccessPak",
+                    "category": "drug"
+                },
+                {
+                    "id": "324",
+                    "name": "Accu-Chek",
+                    "combined": "324:Accu-Chek",
+                    "category": "device"
+                },
+                {...}
+            ]
+
+## Products By Id [/products/{productId}]
+
+### Retrieve a product [GET]
+
++ Parameters 
+    + productId: `274` (number, required) - The ID of the product to be retrieved.
+
++ Response 200 (application/json)
+
+    + Body
+    
+            [
+                {
+                    "id": "274",
+                    "name": "Abbott Gallant ICD",
+                    "combined": "274:Abbott Gallant ICD",
+                    "category": "device"
+                }
+            ]
+         
+            
+# Group Information Resource 
+
+## All Information [/information]
+
+### List all information [GET]
+
++ Response 200 (application/json)
+    
+    + Body
+    
+            [
+                {
+                    "id": "334",
+                    "name": "$1,000,000 or more in losses",
+                    "combined": "334:$1,000,000 or more in losses"
+                },
+                {
+                    "id": "734",
+                    "name": "$1,000,000 or more in property value",
+                    "combined": "734:$1,000,000 or more in property value"
+                },
+                {
+                    "id": "518",
+                    "name": "$10,000 to $24,999 in losses",
+                    "combined": "518:$10,000 to $24,999 in losses"
+                },
+                {...}
+            ]
+
+## Information By Id [/information/{informationId}]
+
+### Retrieve information [GET]
+
++ Parameters 
+    + informationId: `274` (number, required) - The ID of the information to be retrieved.
+
++ Response 200 (application/json)
+
+    + Body
+    
+            [
+                {
+                    "id": "562",
+                    "name": "California Aqueduct",
+                    "combined": "562:California Aqueduct"
+                }
+            ]
+
+# Group Treatment Resource
+
+## All Treatments [/treatments]
+
+### List all treatments [GET]
+
++ Response 200 (application/json)
+    
+    + Body
+    
+            [
+                {
+                    "id": "562",
+                    "name": "Burn Facility",
+                    "category": "treatment"
+                },
+                {
+                    "id": "578",
+                    "name": "Cancer or oncology treatments",
+                    "category": "treatment"
+                },
+                {
+                    "id": "1693",
+                    "name": "Counseling",
+                    "category": "treatment"
+                },
+                {...}
+            ]
+
+# Group Status Resource 
+
+## All Statuses [/status]
+
+### List all statuses [GET]
+
++ Response 200 (application/json)
+    
+    + Body
+    
+            [       
+                {
+                    "id": "16",
+                    "name": "Closed - Contract expired"
+                },
+                {
+                    "id": "11",
+                    "name": "Closed - Does not wish to pursue"
+                },
+                {
+                    "id": "15",
+                    "name": "Closed - Lost to competitor"
+                },
+                {
+                    "id": "3",
+                    "name": "Closed - Settled"
+                },
+                {
+                    "id": "13",
+                    "name": "Closed - Unable to reach"
+                },
+                {
+                    "id": "2",
+                    "name": "Closed for Criteria"
+                },
+                {
+                    "id": "17",
+                    "name": "Closed for Criteria - Manual"
+                },
+                {
+                    "id": "21",
+                    "name": "Contract Declined"
+                },
+                {
+                    "id": "22",
+                    "name": "Contract Deleted"
+                },
+                {
+                    "id": "10",
+                    "name": "Contract Draft"
+                },
+                {
+                    "id": "19",
+                    "name": "Contract Expired"
+                },
+                {
+                    "id": "4",
+                    "name": "Contract Pending - Auto"
+                },
+                {
+                    "id": "12",
+                    "name": "Contract Pending - Manual"
+                },
+                {
+                    "id": "5",
+                    "name": "Contract Pending - Paper"
+                },
+                {
+                    "id": "20",
+                    "name": "Contract Voided"
+                },
+                {
+                    "id": "23",
+                    "name": "Duplicate"
+                },
+                {
+                    "id": "9",
+                    "name": "Incomplete Information"
+                },
+                {
+                    "id": "7",
+                    "name": "Message"
+                },
+                {
+                    "id": "1",
+                    "name": "Other"
+                },
+                {
+                    "id": "6",
+                    "name": "Pending Review"
+                },
+                {
+                    "id": "8",
+                    "name": "Signed"
+                },
+                {
+                    "id": "18",
+                    "name": "Spam"
+                }
+            ]
+
+## Status By Id [/status/{statusId}]
+
+### Retrieve Status [GET]
+
++ Parameters 
+    + statusId: `8` (number, required) - The ID of the status to be retrieved.
+
++ Response 200 (application/json)
+
+    + Body
+    
+            [
+                {
+                    "id": "8",
+                    "name": "Signed"
+                }
+            ]
