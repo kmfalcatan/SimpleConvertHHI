@@ -50,6 +50,32 @@ dropZone.addEventListener('drop', (e) => {
     }
 });
 
+// Check for duplicates in simplyConvert
+async function checkForDuplicates(rows) {
+    try {
+        showNotification('Checking for duplicates... This may take a moment.', 'info');
+        
+        const response = await fetch('/check-duplicates', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ rows: rows })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            console.log('Duplicate check response:', data);
+            return data.duplicates || [];
+        }
+        return [];
+    } catch (error) {
+        console.error('Error checking duplicates:', error);
+        showNotification('Error checking for duplicates', 'error');
+        return [];
+    }
+}
+
 // Preview button click
 previewBtn.addEventListener('click', async () => {
     const file = fileInput.files[0];
@@ -59,12 +85,34 @@ previewBtn.addEventListener('click', async () => {
     }
 
     try {
+        // Show progress
+        const progress = document.getElementById('progress');
+        progress.classList.remove('hidden');
+        
         const text = await file.text();
         parseCSV(text);
+        
+        // Check for duplicates before displaying
+        const duplicateIndices = await checkForDuplicates(csvData.map(row => row.data));
+        
+        console.log('Found duplicates at indices:', duplicateIndices);
+        
+        // Mark duplicates
+        duplicateIndices.forEach(index => {
+            if (csvData[index]) {
+                csvData[index].isDuplicate = true;
+                csvData[index].selected = false; // Uncheck duplicates
+            }
+        });
+        
+        // Hide progress
+        progress.classList.add('hidden');
+        
         displayTable();
         previewSection.classList.remove('hidden');
         previewSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (error) {
+        document.getElementById('progress').classList.add('hidden');
         showNotification('Error reading CSV file: ' + error.message, 'error');
     }
 });
@@ -88,7 +136,7 @@ function parseCSV(text) {
             csvHeaders.forEach((header, index) => {
                 row[header] = values[index].trim().replace(/^"|"$/g, '');
             });
-            csvData.push({ data: row, selected: true, index: i });
+            csvData.push({ data: row, selected: true, index: i, isDuplicate: false });
         }
     }
 }
@@ -153,7 +201,10 @@ function displayTable() {
     const tbody = document.createElement('tbody');
     csvData.forEach((rowData, rowIndex) => {
         const tr = document.createElement('tr');
-        tr.className = 'hover:bg-gray-50 transition';
+        // Add red background for duplicates
+        tr.className = rowData.isDuplicate 
+            ? 'bg-red-100 hover:bg-red-200 transition' 
+            : 'hover:bg-gray-50 transition';
         tr.dataset.index = rowIndex;
         
         // Checkbox cell
@@ -164,14 +215,16 @@ function displayTable() {
         
         // Row number cell
         const rowNumTd = document.createElement('td');
-        rowNumTd.className = 'px-4 py-3 text-sm font-medium text-gray-900 border-b';
+        rowNumTd.className = 'px-4 py-3 text-sm font-medium border-b';
+        rowNumTd.className += rowData.isDuplicate ? ' text-red-900' : ' text-gray-900';
         rowNumTd.textContent = rowData.index;
         tr.appendChild(rowNumTd);
         
         // Data cells
         csvHeaders.forEach(header => {
             const td = document.createElement('td');
-            td.className = 'px-4 py-3 text-sm text-gray-700 border-b';
+            td.className = 'px-4 py-3 text-sm border-b';
+            td.className += rowData.isDuplicate ? ' text-red-900' : ' text-gray-700';
             td.textContent = rowData.data[header] || '';
             tr.appendChild(td);
         });
@@ -185,33 +238,66 @@ function displayTable() {
     
     // Add event listeners
     document.getElementById('selectAllCheckbox').addEventListener('change', (e) => {
-        csvData.forEach(row => row.selected = e.target.checked);
-        document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = e.target.checked);
+        csvData.forEach(row => {
+            // Don't select duplicates
+            if (!row.isDuplicate) {
+                row.selected = e.target.checked;
+            }
+        });
+        document.querySelectorAll('.row-checkbox').forEach(cb => {
+            const index = parseInt(cb.dataset.index);
+            if (!csvData[index].isDuplicate) {
+                cb.checked = e.target.checked;
+            }
+        });
         updateSelectedCount();
     });
     
     document.querySelectorAll('.row-checkbox').forEach(cb => {
         cb.addEventListener('change', (e) => {
             const index = parseInt(e.target.dataset.index);
+            // Prevent selecting duplicates
+            if (csvData[index].isDuplicate) {
+                e.target.checked = false;
+                showNotification('Cannot select duplicate records', 'error');
+                return;
+            }
             csvData[index].selected = e.target.checked;
             updateSelectedCount();
         });
     });
     
     updateSelectedCount();
+    
+    // Show duplicate count if any
+    const duplicateCount = csvData.filter(row => row.isDuplicate).length;
+    if (duplicateCount > 0) {
+        showNotification(`${duplicateCount} duplicate record(s) found and highlighted in red`, 'error');
+    }
 }
 
 // Update selected count
 function updateSelectedCount() {
     const count = csvData.filter(row => row.selected).length;
-    selectedCount.textContent = `${count} of ${csvData.length} selected`;
+    const duplicateCount = csvData.filter(row => row.isDuplicate).length;
+    selectedCount.textContent = `${count} of ${csvData.length} selected (${duplicateCount} duplicates)`;
     uploadSelectedBtn.disabled = count === 0;
 }
 
 // Select all button
 selectAllBtn.addEventListener('click', () => {
-    csvData.forEach(row => row.selected = true);
-    document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = true);
+    csvData.forEach(row => {
+        // Don't select duplicates
+        if (!row.isDuplicate) {
+            row.selected = true;
+        }
+    });
+    document.querySelectorAll('.row-checkbox').forEach(cb => {
+        const index = parseInt(cb.dataset.index);
+        if (!csvData[index].isDuplicate) {
+            cb.checked = true;
+        }
+    });
     document.getElementById('selectAllCheckbox').checked = true;
     updateSelectedCount();
 });
@@ -325,11 +411,13 @@ uploadSelectedBtn.addEventListener('click', async () => {
 
 function showNotification(message, type) {
     const notification = document.createElement('div');
-    notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg ${
-        type === 'error' ? 'bg-red-500' : 'bg-green-500'
-    } text-white z-50`;
+    let bgColor = 'bg-green-500';
+    if (type === 'error') bgColor = 'bg-red-500';
+    if (type === 'info') bgColor = 'bg-blue-500';
+    
+    notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg ${bgColor} text-white z-50`;
     notification.innerHTML = `
-        <i class="fas ${type === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle'} mr-2"></i>
+        <i class="fas ${type === 'error' ? 'fa-exclamation-circle' : type === 'info' ? 'fa-info-circle' : 'fa-check-circle'} mr-2"></i>
         ${message}
     `;
     document.body.appendChild(notification);
